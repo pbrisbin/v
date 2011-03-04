@@ -41,22 +41,21 @@ list=false
 
 while [[ -n "$1" ]]; do
   case "$1" in
-    -h|--help) message                  ;;
-    -l|--list) list=true                ;;
-    --)        shift; regex="$1"; break ;;
+    -h|--help) message      ;;
+    -l|--list) list=true    ;;
+    --)        shift; break ;;
 
     # this isn't great but it's the best we've got
-    -*|--*) vopts+=( "$1" )   ;;
-    +*)     vopts+=( "$1" )   ;;
-
-    *)      regex="$1"; break ;;
+    -*) vopts+=( "$1" ) ;;
+    +*) vopts+=( "$1" ) ;;
+    *)  break           ;;
   esac
   shift
 done
 
-[[ -z "$regex" ]] && message
+[[ -z "$1" ]] && message
 
-matches=( $(sed '/^> \(.*\)/!d;s//\1/g;s%~%'"$HOME"'%g' "$viminfo" | grep "$regex") )
+matches=( $(sed '/^> \(.*\)/!d;s//\1/g;s%~%'"$HOME"'%g' "$viminfo" | grep "$1") )
 
 [[ "${#matches[@]}" -eq 0 ]] && errorout 'no results found'
 
