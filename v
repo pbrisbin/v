@@ -1,57 +1,71 @@
 #!/bin/bash
+#
+# fork of https://github.com/rupa/v
+#
+###
 
-vim=vim
-viminfo=~/.viminfo
+message() {
+  echo 'v [ -l ] [ vim opts ] <regex>'
+  exit 1
+}
 
-usage="$(basename $0) [-a] [-l] [-[0-9]] [--debug] [--help] [regexes]"
+errorout() {
+  echo "$*" >&2
+  exit 1
+}
 
-[ $1 ] || list=true
+edit_from_list() {
+  local i choice
+  local args=( "$@" )
 
-args=()
-deleted=false
+  for ((i=0; i < "${#args[@]}"; i++)); do
+    echo -e "$i:\t${args[i]}"
+  done
+  echo
 
-for x; do case $x in
-    -a) deleted=true;;
-    -l) list=true;;
-    -[1-9]) edit=${x:1}; shift;;
-    --help) echo $usage; exit;;
-    --debug) vim=echo;;
-    --) shift; args+=( "$*" ); break;;
-    *) args+=( "$x" ) ;;
-esac; shift; done
+  read -r -p '> ' choice
 
-for x in "${args[@]}"; do
-  [ -f "$x" ] && {
-      "$vim" "$x"
-      exit
-  }
+  # invalid choices
+  [[ -n "${choice//[0-9]/}"      ]] && errorout 'invalid choice'
+  [[ "$choice" -lt 0             ]] && errorout 'invalid choice'
+  [[ "$choice" -ge "${#args[@]}" ]] && errorout 'invalid choice'
+
+  "$vim" "${vopts[@]}" "${args[choice]}"
+}
+
+# config
+viminfo="$HOME/.viminfo"
+vim='vim'
+
+list=false
+
+while [[ -n "$1" ]]; do
+  case "$1" in
+    -h|--help) message                  ;;
+    -l|--list) list=true                ;;
+    --)        shift; regex="$1"; break ;;
+
+    # this isn't great but it's the best we've got
+    -*|--*) vopts+=( "$1" )   ;;
+    +*)     vopts+=( "$1" )   ;;
+
+    *)      regex="$1"; break ;;
+  esac
+  shift
 done
 
-while read line; do
-    [ "${line:0:1}" = ">" ] || continue
-    fl=${line:2}
-    [ -f "$(eval echo $fl)" -o "$deleted" ] || continue
-    match=1
-    for x in "${args[@]}"; do
-        [[ "$fl" =~ $x ]] || match=
-    done
-    [ "$match" ] || continue
-    i=$((i+1))
-    files[$i]="$fl"
-done < "$viminfo"
+[[ -z "$regex" ]] && message
 
-if [ "$edit" ]; then
-    resp=${files[$edit]}
-elif [ "$i" = 1 -o "$list" = "" ]; then
-    resp=${files[1]}
-elif [ "$i" ]; then 
-    while [ $i -gt 0 ]; do
-         echo -e "$i\t${files[$i]}"
-         i=$((i-1))
-    done
-    read -p '> ' CHOICE
-    resp=${files[$CHOICE]}
+matches=( $(sed '/^> \(.*\)/!d;s//\1/g;s%~%'"$HOME"'%g' "$viminfo" | grep "$regex") )
+
+[[ "${#matches[@]}" -eq 0 ]] && errorout 'no results found'
+
+if [[ "${#matches[@]}" -eq 1 ]]; then
+  "$vim" "${vopts[@]}" "${matches[0]}"
+else
+  if $list; then
+    edit_from_list "${matches[@]}"
+  else
+    "$vim" "${vopts[@]}" "${matches[0]}"
+  fi
 fi
-
-[ "$resp" ] || exit
-"$vim" "$(eval echo $resp)"
