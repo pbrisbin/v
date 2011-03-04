@@ -5,30 +5,34 @@ viminfo=~/.viminfo
 
 usage="$(basename $0) [-a] [-l] [-[0-9]] [--debug] [--help] [regexes]"
 
-[ $1 ] || list=1
+[ $1 ] || list=true
+
+args=()
+deleted=false
 
 for x; do case $x in
-    -a) deleted=1;;
-    -l) list=1;;
+    -a) deleted=true;;
+    -l) list=true;;
     -[1-9]) edit=${x:1}; shift;;
     --help) echo $usage; exit;;
     --debug) vim=echo;;
-    --) shift; fnd="$fnd $*"; break;;
-    *) fnd="$fnd $x";;
+    --) shift; args+=( "$*" ); break;;
+    *) args+=( "$x" ) ;;
 esac; shift; done
-set -- $fnd
 
-[ -f "$1" ] && {
-    "$vim" "$1"
-    exit
-}
+for x in "${args[@]}"; do
+  [ -f "$x" ] && {
+      "$vim" "$x"
+      exit
+  }
+done
 
 while read line; do
     [ "${line:0:1}" = ">" ] || continue
     fl=${line:2}
     [ -f "$(eval echo $fl)" -o "$deleted" ] || continue
     match=1
-    for x; do
+    for x in "${args[@]}"; do
         [[ "$fl" =~ $x ]] || match=
     done
     [ "$match" ] || continue
